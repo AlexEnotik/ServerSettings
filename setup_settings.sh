@@ -100,7 +100,6 @@ chmod -R 700 "$EASYRSA_BASEDIR"
 if [ ! -f "$EASYRSA_BASEDIR/pki/ca.crt" ]; then
     echo "Инициализация PKI..."
     cd "$EASYRSA_BASEDIR" 
-
     ./easyrsa init-pki
 else
     echo "PKI уже инициализирована."
@@ -109,22 +108,7 @@ fi
 # 3. Создание корневого сертификата для центра, если он еще не создан.
 if [ ! -f "$EASYRSA_BASEDIR/pki/ca.crt" ]; then
     echo "Создание корневого сертификата..."
-
-    # Запрос парольной фразы у пользователя
-    read -s -p "Введите парольную фразу для корневого сертификата: " CA_PASSPHRASE
-    echo # Добавить новую строку после ввода пароля
-    if [ -z "$CA_PASSPHRASE" ]; then
-        echo "Парольная фраза не может быть пустой."
-        exit 1
-    ficd "$EASYRSA_BASEDIR"  
-    # Создание корневого сертификата с использованием парольной фразы
-    export EASYRSA_BATCH="yes" # Отключение интерактивного режима
-    export EASYRSA_PASSPHRASE="$CA_PASSPHRASE"
-
     ./easyrsa build-ca  
-    unset EASYRSA_BATCH
-    unset EASYRSA_PASSPHRASE
-
     echo "Корневой сертификат создан."
 else
     echo "Корневой сертификат уже существует."
