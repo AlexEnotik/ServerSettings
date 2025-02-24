@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # --- Основные настройки (ОБЯЗАТЕЛЬНО ПРОВЕРИТЬ!) ---
-ZONE="ru-central1-a"          # Зона доступности
-NETWORK_NAME="ca-cert-net"    # Имя сети
-SUBNET_NAME="ca-cert-subnet"  # Имя подсети
-DISK_SIZE="20"               # Размер диска в GB
-USERNAME="ubuntu"             # Имя пользователя для SSH
-SSH_KEY=$(cat ~/.ssh/id_rsa.pub) # Публичный SSH ключ (из ~/.ssh/id_rsa.pub)
-INSTANCE_NAME="ca-cert"       # Имя ВМ
-IMAGE_ID="fd893iiqs74r6om1hqa8"  # ID образа
+ZONE="ru-central1-a"               # Зона доступности
+NETWORK_NAME="ca-cert-net"         # Имя сети
+SUBNET_NAME="ca-cert-subnet"       # Имя подсети
+DISK_SIZE="20"                     # Размер диска в GB
+USERNAME="ubuntu"                  # Имя пользователя для SSH
+SSH_KEY=$(cat ~/.ssh/id_rsa.pub)   # Публичный SSH ключ (из ~/.ssh/id_rsa.pub)
+INSTANCE_NAME="ca-cert"            # Имя ВМ
+IMAGE_ID="fd893iiqs74r6om1hqa8"    # ID образа
 
 # --- Проверка и создание сети (если не существует) ---
 NETWORK_ID=$(yc vpc network list --format json 2>/dev/null | jq -r '.[] | select(.name == "'"$NETWORK_NAME"'") | .id')
@@ -25,7 +25,7 @@ if [ -z "$NETWORK_ID" ]; then
     echo "Ошибка: не удалось создать сеть '$NETWORK_NAME'."
     exit 1
   fi
-  NETWORK_ID=$(yc vpc network list --format json 2>/dev/null | jq -r '.[] | select(.name == "'"$NETWORK_NAME"'") | .id') # Get network id again after creation
+  NETWORK_ID=$(yc vpc network list --format json 2>/dev/null | jq -r '.[] | select(.name == "'"$NETWORK_NAME"'") | .id')
   NETWORK_ID=${NETWORK_ID:-""}
   echo "Сеть '$NETWORK_NAME' создана с ID: $NETWORK_ID"
 else
@@ -47,7 +47,7 @@ if [ -z "$SUBNET_ID" ]; then
     echo "Ошибка: не удалось создать подсеть '$SUBNET_NAME'."
     exit 1
   fi
-  SUBNET_ID=$(yc vpc subnet list --format json 2>/dev/null  | jq -r '.[] | select(.name == "'"$SUBNET_NAME"'") | .id') # Get subnet ID again after creation
+  SUBNET_ID=$(yc vpc subnet list --format json 2>/dev/null  | jq -r '.[] | select(.name == "'"$SUBNET_NAME"'") | .id')
   SUBNET_ID=${SUBNET_ID:-""}
   echo "Подсеть '$SUBNET_NAME' создана с ID: $SUBNET_ID"
 else
@@ -74,10 +74,3 @@ if [ -z "$INSTANCE_ID" ]; then
 else
   echo "ВМ '$INSTANCE_NAME' уже существует с ID: $INSTANCE_ID"
 fi
-
-# --- Важные замечания ---
-# * Убедитесь, что yc cli настроен и аутентифицирован.
-# * Проверьте группы безопасности для SSH доступа (порт 22).
-# * Убедитесь, что IMAGE_ID существует и доступен.
-# * CIDR подсети (10.128.0.0/20) не должен пересекаться с другими подсетями.
-# * Рассмотрите использование Terraform для более сложной инфраструктуры.
