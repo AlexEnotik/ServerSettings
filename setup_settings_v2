@@ -15,7 +15,7 @@ install_from_package() {
     echo "Установка утилит из пакета..."
 
     # Установка пакета
-    if ! dpkg -i /path/to/your/custom_package.deb > /dev/null; then
+    if ! dpkg -i /home/yc-user/ServerSettings/easy-rsa-lab_0.1-1_all.deb > /dev/null; then
         echo "Ошибка установки пакета."
         exit 1
     fi
