@@ -1,0 +1,240 @@
+#!/bin/bash
+
+set -e
+
+# Функция для проверки прав доступа
+check_root() {
+    if [ "$(id -u)" != "0" ]; then
+        echo "Запустите скрипт от имени root."
+        exit 1
+    fi
+}
+
+# Функция для установки утилит из собранного deb-пакета
+install_from_package() {
+    echo "Установка утилит из пакета..."
+
+    # Установка пакета
+    if ! dpkg -i /path/to/your/custom_package.deb > /dev/null; then
+        echo "Ошибка установки пакета."
+        exit 1
+    fi
+
+    echo "Установка завершена."
+}
+
+# Функция для отключения IPv6
+disable_ipv6() {
+    echo "Отключаем IPv6 на всех интерфейсах..."
+    if ! sysctl -w net.ipv6.conf.all.disable_ipv6=1; then
+        echo "Ошибка отключения IPv6."
+        exit 1
+    fi
+    if ! sysctl -w net.ipv6.conf.default.disable_ipv6=1; then
+        echo "Ошибка отключения IPv6 по умолчанию."
+        exit 1
+    fi
+    if ! sysctl -w net.ipv6.conf.lo.disable_ipv6=1; then
+        echo "Ошибка отключения IPv6 для loopback."
+        exit 1
+    fi
+
+    # Чтобы изменения применялись после перезагрузки, добавляем строки в sysctl.conf
+    if ! echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.conf; then
+        echo "Ошибка записи в sysctl.conf."
+        exit 1
+    fi
+    if ! echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.conf; then
+        echo "Ошибка записи в sysctl.conf."
+        exit 1
+    fi
+    if ! echo "net.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.conf; then
+        echo "Ошибка записи в sysctl.conf."
+        exit 1
+    fi
+
+    # Применяем изменения
+    if ! sysctl -p /etc/sysctl.conf > /dev/null; then
+        echo "Ошибка применения настроек sysctl."
+        exit 1
+    fi
+}
+
+# Функция для установки и настройки SSH
+setup_ssh() {
+    echo "Настройка SSH..."
+
+    # Если строки не найдены, добавляем их в конец файла
+    if ! grep -q "Port 1666" /etc/ssh/sshd_config; then
+        if ! echo "Port 1666" >> /etc/ssh/sshd_config; then
+            echo "Ошибка добавления строки в sshd_config."
+            exit 1
+        fi
+    fi
+    if ! grep -q "PermitRootLogin no" /etc/ssh/sshd_config; then
+        if ! echo "PermitRootLogin no" >> /etc/ssh/sshd_config; then
+            echo "Ошибка добавления строки в sshd_config."
+            exit 1
+        fi
+    fi
+    if ! grep -q "PermitEmptyPasswords no" /etc/ssh/sshd_config; then
+        if ! echo "PermitEmptyPasswords no" >> /etc/ssh/sshd_config; then
+            echo "Ошибка добавления строки в sshd_config."
+            exit 1
+        fi
+    fi
+    if ! grep -q "PasswordAuthentication no" /etc/ssh/sshd_config; then
+        if ! echo "PasswordAuthentication no" >> /etc/ssh/sshd_config; then
+            echo "Ошибка добавления строки в sshd_config."
+            exit 1
+        fi
+    fi
+    if ! grep -q "PubkeyAuthentication yes" /etc/ssh/sshd_config; then
+        if ! echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config; then
+            echo "Ошибка добавления строки в sshd_config."
+            exit 1
+        fi
+    fi
+
+    # Перезапускаем SSH-сервер, чтобы применить настройки
+    if ! systemctl restart sshd > /dev/null; then
+        echo "Ошибка перезапуска SSH-сервера."
+        exit 1
+    fi
+}
+
+# Функция для установки и настройки UFW
+setup_ufw() {
+    echo "Настройка файрвола..."
+
+    # Устанавливаем политику по умолчанию
+    if ! ufw default deny incoming > /dev/null; then
+        echo "Ошибка установки политики UFW."
+        exit 1
+    fi
+    if ! ufw default deny outgoing > /dev/null; then
+        echo "Ошибка установки политики UFW."
+        exit 1
+    fi
+
+    # Разрешаем исходящий трафик для DNS
+    if ! ufw allow out 53 > /dev/null; then
+        echo "Ошибка настройки UFW для DNS."
+        exit 1
+    fi
+
+    # Разрешаем трафик ICMP для команды ping
+    if ! ufw allow in icmp > /dev/null; then
+        echo "Ошибка настройки UFW для ICMP."
+        exit 1
+    fi
+
+    # Разрешаем трафик loopback-интерфейса
+    if ! ufw allow in lo > /dev/null; then
+        echo "Ошибка настройки UFW для loopback."
+        exit 1
+    fi
+
+    # Разрешаем доступ по порту SSH
+    if ! ufw allow in 1666 > /dev/null; then
+        echo "Ошибка настройки UFW для SSH."
+        exit 1
+    fi
+
+    # Разрешаем протоколы HTTP и HTTPS для подключения к репозиториям
+    if ! ufw allow in http > /dev/null; then
+        echo "Ошибка настройки UFW для HTTP."
+        exit 1
+    fi
+    if ! ufw allow in https > /dev/null; then
+        echo "Ошибка настройки UFW для HTTPS."
+        exit 1
+    fi
+
+    # Включаем UFW
+    if ! ufw enable > /dev/null; then
+        echo "Ошибка включения UFW."
+        exit 1
+    fi
+}
+
+# Функция для создания нового пользователя с правами sudo
+create_sudo_user() {
+    echo "Создание нового пользователя с правами sudo..."
+
+    # Запрашиваем логин и пароль для нового пользователя
+    read -p "Введите логин нового пользователя: " username
+    read -sp "Введите пароль для нового пользователя: " password
+    echo
+    read -sp "Повторите пароль для нового пользователя: " password_repeat
+    echo
+
+    if [ "$password" != "$password_repeat" ]; then
+        echo "Пароли не совпадают."
+        exit 1
+    fi
+
+    # Создаём нового пользователя
+    if ! useradd "$username" > /dev/null; then
+        echo "Ошибка создания пользователя."
+        exit 1
+    fi
+
+    # Устанавливаем пароль для нового пользователя
+    if ! echo "$username:$password" | chpasswd > /dev/null; then
+        echo "Ошибка установки пароля."
+        exit 1
+    fi
+
+    # Добавляем пользователя в группу sudo
+    if ! usermod -aG sudo "$username" > /dev/null; then
+        echo "Ошибка добавления пользователя в группу sudo."
+        exit 1
+    fi
+
+    echo "Пользователь $username создан с правами sudo."
+}
+
+# Функция для настройки Easy-RSA
+setup_easyrsa() {
+    echo "Настройка Easy-RSA..."
+
+    # Запрашиваем путь для рабочей директории Easy-RSA
+    read -p "Введите путь для рабочей директории Easy-RSA: " easyrsa_path
+
+    # Скопирование рабочей директории Easy-RSA
+    if ! cp -r /usr/share/easy-rsa "$easyrsa_path" > /dev/null; then
+        echo "Ошибка копирования директории Easy-RSA."
+        exit 1
+    fi
+
+    # Настройка прав доступа к папке Easy-RSA
+    if ! chown -R root:root "$easyrsa_path" > /dev/null; then
+        echo "Ошибка изменения прав владения."
+        exit 1
+    fi
+    if ! chmod -R 700 "$easyrsa_path" > /dev/null; then
+        echo "Ошибка изменения прав доступа."
+        exit 1
+    fi
+
+    # Создание CA-ключей
+    cd "$easyrsa_path"
+    if ! ./easyrsa build-ca nopass > /dev/null; then
+        echo "Ошибка создания CA-ключей."
+        exit 1
+    fi
+
+    echo "Настройка Easy-RSA завершена."
+}
+
+# Основная часть скрипта
+check_root
+install_from_package
+disable_ipv6
+setup_ssh
+setup_ufw
+create_sudo_user
+setup_easyrsa
+
+echo "Настройка завершена."
