@@ -106,56 +106,35 @@ setup_ssh() {
 # Функция для установки и настройки UFW
 setup_ufw() {
     echo "Настройка файрвола..."
-
-    # Устанавливаем политику по умолчанию
-    if ! ufw default deny incoming > /dev/null; then
-        echo "Ошибка установки политики UFW."
-        exit 1
-    fi
-    if ! ufw default deny outgoing > /dev/null; then
-        echo "Ошибка установки политики UFW."
-        exit 1
-    fi
-
-    # Разрешаем исходящий трафик для DNS
-    if ! ufw allow out 53 > /dev/null; then
-        echo "Ошибка настройки UFW для DNS."
-        exit 1
-    fi
-
-    # Разрешаем трафик ICMP для команды ping
-    if ! ufw allow in icmp > /dev/null; then
-        echo "Ошибка настройки UFW для ICMP."
-        exit 1
-    fi
-
-    # Разрешаем трафик loopback-интерфейса
-    if ! ufw allow in lo > /dev/null; then
-        echo "Ошибка настройки UFW для loopback."
-        exit 1
-    fi
-
-    # Разрешаем доступ по порту SSH
-    if ! ufw allow in 1666 > /dev/null; then
-        echo "Ошибка настройки UFW для SSH."
-        exit 1
-    fi
-
-    # Разрешаем протоколы HTTP и HTTPS для подключения к репозиториям
-    if ! ufw allow in http > /dev/null; then
-        echo "Ошибка настройки UFW для HTTP."
-        exit 1
-    fi
-    if ! ufw allow in https > /dev/null; then
-        echo "Ошибка настройки UFW для HTTPS."
-        exit 1
-    fi
-
-    # Включаем UFW
-    if ! ufw enable > /dev/null; then
-        echo "Ошибка включения UFW."
-        exit 1
-    fi
+    
+    iptables_add OUTPUT -p tcp --dport 53 -j ACCEPT -m comment --comment dns
+    iptables_add OUTPUT -p udp --dport 53 -j ACCEPT -m comment --comment dns
+    #---NTP---
+    iptables_add OUTPUT -p udp --dport 123 -j ACCEPT -m comment --comment ntp
+    #---REPO---
+    iptables_add OUTPUT -p tcp --dport 1111 -j ACCEPT -m comment --comment repo.justnikobird.ru
+    #---ICMP---
+    iptables_add OUTPUT -p icmp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+    iptables_add INPUT -p icmp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+    #---loopback---
+    iptables_add OUTPUT -o lo -j ACCEPT
+    iptables_add INPUT -i lo -j ACCEPT
+    #---Input-SSH---
+    iptables_add INPUT -p tcp --dport 1870 -j ACCEPT -m comment --comment ssh
+    #---Output-HTTP---
+    iptables_add OUTPUT -p tcp -m multiport --dports 443,80 -j ACCEPT
+    #---ESTABLISHED---
+    iptables_add INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+    iptables_add OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+    #---INVALID---
+    iptables_add OUTPUT -m state --state INVALID -j DROP
+    iptables_add INPUT -m state --state INVALID -j DROP
+    #---Defaul-Drop---
+    iptables -P OUTPUT DROP
+    iptables -P INPUT DROP
+    iptables -P FORWARD DROP
+    
+    
 }
 
 # Функция для создания нового пользователя с правами sudo
